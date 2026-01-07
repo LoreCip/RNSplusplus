@@ -1,0 +1,398 @@
+\documentclass{ol-softwaremanual}
+
+% Packages used in this example
+\usepackage{graphicx}  % for including images
+\usepackage{microtype} % for typographical enhancements
+\usepackage{minted}    % for code listings
+\usepackage{amsmath}   % for equations and mathematics
+\setminted{style=friendly,fontsize=\small}
+\renewcommand{\listoflistingscaption}{List of Code Listings}
+\usepackage{hyperref}  % for hyperlinks
+\usepackage[a4paper,top=4.2cm,bottom=4.2cm,left=3.5cm,right=3.4cm]{geometry} % for setting page size and margins
+\usepackage{longtable}
+
+\usepackage{xcolor, amsmath, amssymb, amscd, amsthm, amsfonts, graphicx, enumitem}
+
+
+% Custom macros used in this example document
+\newcommand{\doclink}[2]{\href{#1}{#2}\footnote{\url{#1}}}
+\newcommand{\cs}[1]{\texttt{\textbackslash #1}}
+\def\dd{{\rm d}}
+\def\e{~{\rm e}}
+
+% Frontmatter data; appears on title page
+\title{\vspace{5 cm}RNS$_{++}$\\Technical Document}
+% \version{2.3.1}
+\author{Lorenzo Cipriani}
+\softwarelogo{\includegraphics[width=8cm]{Logo}}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\pagenumbering{roman}
+\tableofcontents
+% \listoflistings
+
+\newpage
+
+\pagenumbering{arabic}
+\section{Introduction}
+
+The RNS code is a numerical tool designed to compute equilibrium models of rotating neutron stars in full general relativity. Originally based on the Komatsu--Eriguchi--Hachisu (KEH) scheme, the code solves the Einstein field equations under the assumptions of stationarity and axisymmetry. The code has been extended to incorporate differential rotation laws and multi-fluid systems (e.g., baryonic matter admixed with dark matter). In all cases, the goal is to obtain self-consistent solutions for the metric potentials and the matter distribution that satisfy both the gravitational field equations and the relativistic hydrostatic equilibrium.
+
+\subsection{Mathematical Model}
+In the RNS code the equilibrium configuration is described using quasi-isotropic coordinates, where the line element is written as
+\begin{equation}
+ds^2 = - e^{\gamma+\rho}\, dt^2 + e^{2\alpha}\, (dr^2 + r^2\, d\theta^2) + e^{\gamma-\rho}\, r^2 \sin^2\theta\, (d\phi - \omega\, dt)^2.
+\end{equation}
+Here, the metric potentials $\gamma$, $\rho$, $\alpha$, and the frame-dragging potential $\omega$ are functions of the radial coordinate $r$ and the polar angle $\theta$. The proper circumferential radius is recovered via
+\begin{equation}
+R = r\, e^{(\gamma-\rho)/2}.
+\end{equation}
+
+The neutron star is modelled as a perfect fluid with the energy-momentum tensor
+\begin{equation}
+T^{\mu\nu} = (\epsilon + P) \, u^\mu u^\nu + P\, g^{\mu\nu},
+\end{equation}
+where $\epsilon$ is the energy density, $P$ is the pressure, and $u^\mu = \frac{\e^{(\gamma + \rho) / 2}}{\sqrt{1 - v^2}}\left(1,0,0,\Omega \right)$ is the fluid’s four-velocity. For barotropic fluids, the pressure is a unique function of the energy density, and the specific enthalpy is defined as $h = \frac{\epsilon + P}{\rho}$, with $\rho$ being the rest-mass density.
+
+In cases where additional components are considered (such as a dark-matter fluid), the total energy-momentum tensor is written as a sum (e.g., $T^{\mu\nu}_{\text{tot}} = T^{\mu\nu}_{\text{BM}} + T^{\mu\nu}_{\text{DM}}$) with each fluid satisfying its own conservation law.
+
+Having assumed stationarity and axisymmetry, the conservation of the energy-momentum tensor, $\nabla_\mu T^{\mu\nu} = 0$, leads to the relativistic Euler equation. The first integral of hydrostatic equilibrium can be written in the compact form
+\begin{equation}\label{eq:hydroEq}
+H - \ln u^t + \int_{0}^{j} \tilde{j}\, \frac{\dd\Omega}{\dd \tilde{j}} \dd \tilde{j} = \text{constant},
+\end{equation}
+where $H$ is the integrated enthalpy defined as
+\begin{equation}
+H(P) = \int_0^P \frac{dP'}{\epsilon(P') + P'},
+\end{equation}
+In Eq.~\eqref{eq:hydroEq}, $j(\Omega) = u^t u_\phi$ is the gravitationally redshifted specific angular momentum and $\Omega$ the local angular velocity of the fluid. The relation $j(\Omega)$ specifies the rotational profile of the star: for uniformly rotating models, $\Omega$ is constant so the integral term vanishes, while for differentially rotating models this term encodes the chosen rotation law.
+
+\subsection{Differential rotation}
+
+Originally, the RNS code was built to handle uniform rotation; however, many astrophysical scenarios require differential rotation. One common choice is the “j-constant” (KEH) law, which imposes a relation such as
+\begin{equation}
+j(\Omega) = A^2 (\Omega_c - \Omega),
+\end{equation}
+with $A$ a parameter that sets the length scale over which the angular velocity $\Omega$ declines from its central value $\Omega_c$. Extensions of the code have implemented more versatile laws as the Ury\`u law, which parametrizes the angular velocity profile as
+\begin{equation}\label{eq:Uryu8}
+\Omega(j) = \Omega_c \frac{1 + \left(\frac{j}{A^2 \Omega_c}\right)^p}{1 + \left(\frac{j}{B^2 \Omega_c}\right)^{p+q}},
+\end{equation}
+where:
+\begin{itemize}
+  \item $\Omega_c$ is the central angular velocity,
+  \item $A$ and $B$ are length-scale parameters,
+  \item $p$ controls the decline of the angular velocity near the rotation axis,
+  \item $q$ sets the asymptotic, Keplerian fall-off,
+\end{itemize}
+In these formulations the integral in the first integral of the Euler equation can be computed either analytically (for selected choices of $p$ and $q$) or numerically integrated.
+
+Another possible choice is
+\begin{equation}\label{eq:Uryu9+}
+\Omega(j) = \Omega_c \left[ 1 + \left(\frac{j}{B^2 \Omega_c}\right)^p \right]\left[ 1 - \left(\frac{j}{A^2 \Omega_c}\right)^\xi \right]
+\end{equation}
+that more faithfully represents the angular profile in the post merger as recovered from numerical simulations.
+
+\subsection{Numerical Algorithm}
+
+The numerical algorithm implemented in the RNS code consists of the following steps:
+
+\begin{enumerate}
+  \item \textbf{Initial Setup}:
+   The computational domain is set up on a grid defined in quasi-isotropic coordinates, where radial and angular coordinates (i.e., $s = r/(r_e + r)$ and $\mu = \cos\theta$) are used to cover the star and its exterior. The equation of state is read from the table, if provided.
+
+  \item \textbf{Initial Guess:} \\
+    The process begins by computing a nonrotating, spherically symmetric solution of the Tolman-Oppenheimer-Volkoff equations. This solution provides initial profiles for the metric potentials $\gamma$, $\rho$, $\alpha$, $\omega$ and the matter variables (pressure, density, and enthalpy).
+    
+  \item \textbf{Hydrostationary Equilibrium Calculation:} \\
+    Using the first integral of the hydrostatic equilibrium~\eqref{eq:hydroEq}, the code computes the fluid variables at each grid point. In the differential rotation case, this step involves evaluating first the integral term based on the chosen rotation law, ensuring that the local angular velocity distribution $\Omega(r,\theta)$ is consistent with the fluid’s enthalpy and pressure profiles.
+    
+    \textbf{Determination of Angular Velocity:} \\
+    The angular velocity $\Omega$ is not known a priori throughout the star. For the Ury\`u laws \eqref{eq:Uryu8} and \eqref{eq:Uryu9+}, the parameters are updated dynamically by solving for the scaling parameters (typically through prescribed ratios such as $\lambda_1 = \Omega_{\rm max}/\Omega_c$ and $\lambda_2 = \Omega_e/\Omega_c$) to match the desired rotation profile extracted from simulation data. The code determines:
+    \begin{itemize}
+      \item The equatorial angular velocity $\Omega_e$ by equating the hydrostatic equilibrium integral at the equator and at the pole.
+      \item The central angular velocity $\Omega_c$, as set by the rotation law.
+      \item At each grid point, the local value of $\Omega$ is obtained by solving the equation $j(\Omega) = u^t u_\phi$ (or its inverse, depending on the rotation law) using robust root-finding methods (e.g., Brent’s algorithm).
+    \end{itemize}
+    
+  \item \textbf{Update of Metric Potentials:} \\
+    With the updated matter distribution, the Einstein field equations are recast into a set of elliptic equations using the KEH formulation. These equations are solved via Green's function techniques to update the metric potentials $\gamma$, $\rho$, $\alpha$, and $\omega$ on the grid.
+    
+  \item \textbf{Iterative Loop and Convergence Check:} \\
+    The algorithm iterates over the following cycle:
+    \begin{enumerate}
+      \item Recompute the angular velocity distribution $\Omega(r,\theta) $.
+      \item Update fluid variables from the hydrostatic equilibrium integral.
+      \item Solve the metric equations to update the potentials.
+      \item Check convergence by monitoring changes in the equatorial radius~$r_e $.
+    \end{enumerate}
+    Iteration continues until the changes fall below a prescribed tolerance.
+    
+  \item \textbf{Computation of Global Quantities:} \\
+    Once convergence is reached, integrated quantities are computed. Analytical expressions for these quantities are reported in Appendix~\ref{app:ScalarInt}.
+    
+\end{enumerate}
+
+\section{Implementation of the \texttt{main()} driver}
+\label{sec:main}
+
+The \texttt{main()} function serves as the high-level driver that glues together the core computational routines \texttt{sphere}, \texttt{spin} and \texttt{mass\_radius} (the latter computes the macroscopic quantities of the model).  It begins by including the necessary headers:
+\begin{verbatim}
+#include "equil.h"
+#include "equil_util.h"
+#include "nrutil.h"
+#include "output.h"
+#include "parfile.h"
+\end{verbatim}
+and defining the principal data structures: \texttt{struct EOS} for equation-of-state parameters, \texttt{struct stellar\_properties} for central densities and rotation flags, \texttt{struct evolution\_variables} for the 2D metric and fluid fields, and \texttt{struct DiffRotParams} for the differential-rotation profile.  
+
+Next, default values are assigned for tolerances (\texttt{accuracy}, \texttt{cf}), dark-matter fraction (\texttt{fdm\_target}), central energy density (\texttt{star\_props.e\_center}), and differential-rotation constants.  A \texttt{getopt} loop detects a \verb|-c <config>| option: without it, the program writes a template \texttt{config.d} via \texttt{writeConfig(…)} and exits; with it, it reads back all parameters using \texttt{readConfig(…)}.  
+
+If the EOSs are tabulated, the code then calls \texttt{load\_eos()} to read them.  It then builds the angular grid \(\{s_i,\mu_j\}\) with \texttt{make\_grid(s\_gp,mu)} and allocates the solver workspace arrays through \texttt{allocate\_evolution\_variables()}.  
+
+With initialization complete, the driver computes a non-rotating “seed” model by setting the central values via \texttt{make\_center(…)} and invoking
+\begin{verbatim}
+sphere(s_gp, &eosBM, &star_props, &evolution_functions,
+       &r_e_BM, &s_e_BM, &eosDM, &DM_props,
+       &r_e_DM, &s_e_DM, &massBM, &massDM);
+\end{verbatim}
+This yields the baseline equatorial radii and masses for both baryonic and dark components.  In the special case \textbf{DM\_fraction} = 0, the dark matter fields are explicitly zeroed before proceeding.  
+
+The core of the driver is an iteration loop (\texttt{while iter < MAXIT}) that adjusts either the axis ratios \texttt{r\_ratio\_BM}, \texttt{r\_ratio\_DM} or the DM central density to satisfy two convergence criteria: matching the target spin flattening and the target dark-matter mass fraction.  Within each iteration, one or more calls to
+\begin{verbatim}
+spin(s_gp, mu, &eosBM, &star_props, &evolution_functions,
+     accuracy, cf, r_ratio_BM, &r_e_BM, &Omega_BM,
+     s_e_BM, &eosDM, &DM_props, r_ratio_DM,
+     &r_e_DM, &Omega_DM, s_e_DM, verbose, &outOfiter,
+     counter, &Omega_e_BM, &DiffRotBM, &Omega_e_DM,
+     &DiffRotDM, zero);
+\end{verbatim}
+brackets and refines the axis ratios until they lie within prescribed tolerances.  Optionally, this update can be replaced by a root-finding subroutine (e.g.\ Newton–Raphson) that calls \texttt{spin} as a black-box.  A built-in “parabola” weighting of the differential‐rotation profile is applied in the sample to enhance stability, but users can remove or generalize this heuristic.  
+
+Once both spin and mass fraction targets are met (or \(\texttt{iter==MAXIT}\)), the driver computes all global diagnostics via
+\begin{verbatim}
+mass_radius(s_gp, mu, &eosBM, &evolution_functions,
+            r_ratio_BM, r_e_BM, Omega_BM,
+            &Mass_BM, &Mass_0_BM, &J_BM, &R_e_BM,
+            … , &Mass_DM, &Mass_0_DM, &J_DM,
+            &R_e_DM, …);
+\end{verbatim}
+which returns ADM mass, baryonic/rest mass, angular momentum, equatorial radius, Kepler frequency, kinetic/potential energies, and the final dark-matter fraction \(\mathrm{fdm}=M_{\rm DM}/(M_{\rm BM}+M_{\rm DM})\).  
+
+Finally, the results are printed to \texttt{stdout} for human inspection, written to a data file via \texttt{print\_output(...)}, and, if enabled, exported into HDF5 2D snapshots and 1D profiles.
+
+All along, the user may wrap the seed–spin–compute block in external loops over central density or EOS files to perform parameter sweeps, or replace the internal ratio updates with custom root-finding calls.  By following this workflow, one obtains a modular, extensible driver where \texttt{sphere}, \texttt{spin} and \texttt{mass\_radius} form the only building blocks users need to explore arbitrary regions of parameter space.
+
+\subsection{List of main drivers:}
+
+\begin{itemize}
+    \item \textbf{RNS\_Diff\_one}: Standard driver, computes one model for a specified r\_ratios and energies. 
+    \item \textbf{RNS\_Diff\_Jc}: Computes a model at a fixed total angular momentum $J_{tot}$, with a fixed percentage of it in $J_{DM}$.
+    \item \textbf{RNS\_Diff\_BM}: Computes a model at a fixed baryonic angular momentum $J_{BM}$, with a fixed percentage of $J_{tot}$ in $J_{DM}$.
+\end{itemize}
+
+
+\section{Description of the input file}
+
+The input file can be generated by running the main program without any additional command line arguments. This file will be created in the current directory and named ``\texttt{config.d}". It contains all the parameters that can be passed to the algorithm, including their names, default values, and a brief description, as detailed below. To add extra parameters, the appropriate routines in the source file ``\texttt{src/parfile.c}" should be modified.
+
+Please note that the parameters are not validated for consistency at the start of the run. It is the user's responsibility to ensure that the input values are correct. Parameters whose name contains a $\mathcal{X}$ are present for both the BM and DM and are set substituting it with the appropriate label.
+
+\begin{itemize}
+    \item \textbf{id\_file} (String): Path to a $\mathrm{.h5}$ file containing the initial data for the run, useful to skip repeated restarts.
+    \item \textbf{EoS\_$\mathcal{X}$\_type} (Integer): Accepted Values: 0 $\rightarrow$polytropic, 1 $\rightarrow$tabulated. Description: Type of EoS for BM.
+    \item \textbf{EoS\_$\mathcal{X}$\_file} (String): Description: Path to the EoS file, required only if \textbf{EoS\_$\mathcal{X}$\_type} = 1.
+    \item \textbf{EoS\_$\mathcal{X}$\_N} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Expontent for polytropic EoS, $P \propto \rho^{(1 + 1 / N)}$, required if \textbf{EoS\_$\mathcal{X}$\_type} = 0.
+    \item \textbf{accuracy} (Float): Accepted Values: < 1. Description: Accuracy goal for the simulation.
+    \item \textbf{$\mathcal{X}$\_central\_energy} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Central energy density for $\mathcal{X}$. Its use depends on the actual implementation of the main program (see Sec.~\ref{sec:main}). It is expressed in g cm$^{-3} \times 10^{-15}$ (e.g., to input a central energy density of $2\times 10^{15}$g cm$^{-3}$ the parameter \textbf{$\mathcal{X}$\_central\_energy} must be set equal to 2).
+    \item \textbf{DM\_particle\_mass} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Mass of the DM particle in MeV.
+    \item \textbf{DM\_fraction} (Float): Accepted Values: < 1. Description: Target dark matter fraction. If set to zero, the code will solve the TOV equations for some small value of \textbf{DM\_central\_energy} and then set all DM fields to zero.
+    \item \textbf{DM\_fraction\_tol} (Float): Accepted Values: < 1. Description: Tolerance in determination of the target dark matter fraction.
+    \item \textbf{$\mathcal{X}$\_rotation\_type} (Integer): Type of rotation for $\mathcal{X}$. Accepted Values: 0 $\rightarrow$Uniform, 1 $\rightarrow$J constant, 2 $\rightarrow$Uryu 8, 3 $\rightarrow$Uryu Extended. Description: Type of rotation for $\mathcal{X}$.
+    \item \textbf{$\mathcal{X}$\_A} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Uryu parameter A. Required if \textbf{$\mathcal{X}$\_rotation\_type} = 1, 2, 3.
+    \item \textbf{$\mathcal{X}$\_B} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Uryu parameter B. Required if \textbf{$\mathcal{X}$\_rotation\_type} = 2, 3.
+    \item \textbf{$\mathcal{X}$\_lambda1} (Float): Accepted Values: > 1. Description: Set the ratio $\Omega_{\text{equator}} / \Omega_{\text{central}}$. This should be automatically satisfied by valid models. Required if \textbf{$\mathcal{X}$\_rotation\_type} = 2, 3.
+    \item \textbf{$\mathcal{X}$\_lambda2} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Set the ratio $\Omega_{\text{max}} / \Omega_{\text{central}}$. This is imposed during the model convergence. Required if \textbf{$\mathcal{X}$\_rotation\_type} = 2, 3.
+    \item \textbf{$\mathcal{X}$\_p} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Uryu parameter p. Required if BM\_rotation\_type = 3.
+    \item \textbf{$\mathcal{X}$\_csi} (Float): Accepted Values: $\mathbb{R}_{+}$. Description: Uryu parameter csi. Required if BM\_rotation\_type = 3.
+    \item \textbf{counter\_rotation} (Integer): Accepted Values: 0 $\rightarrow$Corotating configuration, 1 $\rightarrow$Counter-rotating configuration. Description: Set whether DM counter-rotates with respect to the BM.
+    \item \textbf{r\_ratio\_$\mathcal{X}$} (Float): Accepted Values: < 1. Description: Desired ratio of polar and equatorial radius for $\mathcal{X}$. Actual usage depends on implementation of the main driver.
+    \item \textbf{r\_step} (Float): Accepted Values: < 1- Description: Step-size used in the algorithm to reach desired \textbf{r\_ratio\_$\mathcal{X}$}. Actual usage depends on implementation of the main driver.
+    \item \textbf{1Doutput} (Integer): Accepted Values:  0 $\rightarrow$no, 1 $\rightarrow$yes. Description: Enable 1D output.
+    \item \textbf{2Doutput} (Integer): Accepted Values:  0 $\rightarrow$no, 1 $\rightarrow$yes. Description: Enable 2D output.
+    \item \textbf{output\_name} (String): Name of the $\mathrm{.dat}$ and $\mathrm{.h5}$ output files. Default is $\mathrm{auto}$. Do not specify the extension!
+    \item \textbf{verbose} (Integer): Accepted Values: {0-4}. Description: Enable different levels of verbosity.
+\end{itemize}
+
+Note that to compute a model without the dark matter fluid, it is needed to set the following parameters:
+\begin{itemize}
+    \item \textbf{DM\_fraction} = 0
+\end{itemize}
+The code will automatically set the following:
+\begin{itemize}
+    \item \textbf{DM\_central\_energy} = 1e-3;
+    \item \textbf{DM\_rotation\_type} = 0;
+    \item \textbf{r\_ratio\_DM} = 1;
+\end{itemize}
+Then it will compute the initial TOV solution for 2 fluids, set all matter fields to zero and skip all computations related to the second fluid.
+
+\section{Description of output}
+
+The output file module is designed to manage simulation data output, supporting both plain text and HDF5 formats. This section provides a thorough description of its components and functionality.
+
+\subsection{Text File Output}
+
+The module defines routines for creating and writing formatted text files containing simulation results. The main functions include:
+
+\begin{itemize}
+    \item \textbf{File Initialization:} A function is provided to open a file for writing. It attempts to create a new file and, upon failure (e.g., if the file cannot be opened), it terminates the program after reporting an error. At the time of file creation, a header line is written. This header lists all the output fields such as central energy densities, equatorial and polar radii, masses normalized by the solar mass, various angular velocities, and additional astrophysical parameters.
+    \item \textbf{Data Output:} A dedicated function outputs the simulation data in a tabulated format. It employs a strict numerical format (using high-precision formatting specifiers) to maintain uniformity of output across all columns. Variables are carefully scaled and converted as necessary before being written. The list of saved quantities is as follows:
+
+\begin{enumerate}
+    \item \textbf{BM\_e\_center} – Central energy density of the baryonic component.
+    \item \textbf{R\_e\_BM (km)} – Equatorial radius of the baryonic matter, in kilometers.
+    \item \textbf{R\_p\_BM (km)} – Polar radius of the baryonic matter, in kilometers.
+    \item \textbf{Mass\_BM ($M_\odot$)} – Gravitational mass of the baryonic matter, in solar masses.
+    \item \textbf{Mass\_0\_BM ($M_\odot$)} – Rest mass (baryonic mass) of the baryonic component, in solar masses.
+    \item \textbf{DM\_e\_center} – Central energy density of the dark matter component.
+    \item \textbf{R\_e\_DM (km)} – Equatorial radius of the dark matter component, in kilometers.
+    \item \textbf{R\_p\_DM (km)} – Polar radius of the dark matter component, in kilometers.
+    \item \textbf{Mass\_DM ($M_\odot$)} – Gravitational mass of the dark matter component, in solar masses.
+    \item \textbf{Mass\_0\_DM ($M_\odot$)} – Rest mass of the dark matter component, in solar masses.
+    \item \textbf{Mtot ($M_\odot$)} – Total gravitational mass of the system (BM + DM), in solar masses.
+    \item \textbf{fdm} – Fraction of the total mass composed of dark matter, defined as \( M_{\mathrm{DM}} / M_{\mathrm{tot}} \).
+    \item \textbf{Omega\_BM (Hz)} – Angular velocity of the baryonic matter, in hertz. Meaningful only for the Uniform rotation profile.
+    \item \textbf{Omega\_DM (Hz)} – Angular velocity of the dark matter, in hertz. Meaningful only for the Uniform rotation profile.
+    \item \textbf{J\_BM/$M^2_\mathrm{BM}$} – Dimensionless spin parameter of the baryonic component.
+    \item \textbf{J\_DM/$M^2_\mathrm{DM}$} – Dimensionless spin parameter of the dark matter component.
+    \item \textbf{r\_ratio\_BM} – Axis ratio (polar to equatorial) of the baryonic component.
+    \item \textbf{r\_ratio\_DM} – Axis ratio of the dark matter component.
+    \item \textbf{Omega\_K\_BM (Hz)} – Keplerian (mass-shedding) angular velocity of the baryonic matter, in hertz.
+    \item \textbf{Omega\_K\_DM (Hz)} – Keplerian angular velocity of the dark matter component, in hertz.
+    \item \textbf{T\_BM} – Rotational kinetic energy of the baryonic component.
+    \item \textbf{T\_DM} – Rotational kinetic energy of the dark matter component.
+    \item \textbf{W\_BM} – Gravitational potential energy of the baryonic component.
+    \item \textbf{W\_DM} – Gravitational potential energy of the dark matter component.
+\end{enumerate}
+    \item \textbf{Closing the File:} Finally, a utility function ensures that the file is properly closed once all writing operations are complete, ensuring that all data is flushed and the file is in a consistent state.
+\end{itemize}
+
+\subsection{HDF5 Data Handling}
+
+The code also integrates the HDF5 library for managing more complex data storage, which involves both grid data and metadata. Two primary routines are responsible for saving and reading data:
+
+\begin{itemize}
+    \item \textbf{Saving Simulation Data:}
+    \begin{itemize}
+        \item The HDF5 save routine first creates a new file using default properties.
+        \item It then constructs an array of attributes that capture essential simulation parameters. These attributes include information about the equation of state, stellar structure properties (such as central energy densities), and rotation parameters.
+        \item In addition to attributes, the function writes out grid data (for spatial coordinates) as well as two-dimensional arrays that represent various physical quantities (for example, potential, energy density, pressure, and angular velocities).
+        \item Each dataset is accompanied by descriptive metadata which annotates the physical meaning of the stored variable.
+    \end{itemize}
+
+    \item \textbf{Reading Simulation Data:}
+    \begin{itemize}
+        \item The corresponding read routine opens an existing HDF5 file in read-only mode.
+        \item It retrieves all stored attributes to restore simulation parameters, including converting string representations of differential rotation types into their internal enumerated form.
+        \item Grid point arrays and datasets are then read into memory, reconstructing two-dimensional simulation data structures that are used for subsequent analysis.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Profile Data Export}
+
+An auxiliary function is included to generate radial profiles for selected simulation variables. Its operation involves:
+\begin{itemize}
+    \item Checking for an existing file and safely removing it if necessary.
+    \item Creating a two-column output where the first column represents the radial coordinate (derived from the simulation grid) and the second contains the corresponding variable value.
+    \item Iterating over the grid resolution to output data with consistent precision.
+\end{itemize}
+
+\newpage
+\appendix
+
+\section{Analytical expressions of global quantities\label{app:ScalarInt}}
+Given $r_e = \max{\left( r_e^{BM}, r_e^{DM}\right)}$, the differentials are:
+\begin{equation*}
+\begin{cases}
+\dd r &= r_e \frac{\dd s}{\left(1 - s\right)^2}\\
+\dd \theta & = - \frac{\dd \mu}{\sin\theta}
+\end{cases}
+\end{equation*}
+For i = BM, DM:
+\begin{itemize}
+
+\item Circumferential radius:
+\begin{equation*}
+R_e^i = r_e^i \e^{\frac{\gamma_e^i - \rho_e^i}{2}}
+\end{equation*}
+\begin{equation*}
+\gamma_e^i = \gamma(s = s_e^i, \mu = 0),\quad \rho_e^i = \rho(s = s_e^i, \mu = 0)
+\end{equation*}
+
+\item  Gravitational mass:
+\begin{equation}\label{eq:mgrav}
+\begin{split}
+M_i =& \int_0^\infty \!\!\!\!\!\dd r \int_0^\pi \!\!\!\!\!\dd \theta \int_0^{2\pi} \!\!\!\!\!\dd \phi \left( -2 {T_i^0}_0 + {T_i^\mu}_\mu\right) \sqrt{-g}
+\\=& \begin{split}4\pi \int_0^1 r_e & \frac{\dd s}{(1-s)^2} \left(r_e \frac{s}{1-s}\right)^2 \int_0^1 \dd \mu \e^{2\alpha + \gamma} \left[ \frac{e_i + P_i}{1 - v_i^2} \times \right. \\ 
+& \left.\left(1 + v_i^2 + 2 \omega r_e \frac{s}{1 - s} v_i \sqrt{1 - \mu^2} \e^{-\rho} \right)+ 2 P_i \right]
+\end{split}
+\end{split}
+\end{equation}
+
+\item Rest mass:
+\begin{equation*}
+M^0_i = 4\pi \int r_e \frac{\dd s}{(1-s)^2} \left(r_e \frac{s}{1-s}\right)^2 \int \dd \mu \e^{2\alpha + \frac{\gamma-\rho}{2}} \frac{\rho^0_i}{\sqrt{1 - v_i^2}}
+\end{equation*}
+\begin{equation*}
+\rho^0_i =  \left(e_i + P_i\right) \e^{-h_i}  \text{ or interpolation from table}
+\end{equation*}
+
+\item Angular momentum:
+\begin{equation*}
+J_i = 4\pi \int r_e\frac{\dd s}{(1-s)^2} \left(r_e \frac{s}{1-s}\right)^3 \int \dd \mu \e^{2\alpha + \gamma - \rho} (e_i + P_i) \frac{v_i}{1 - v_i^2} \sqrt{1 - \mu^2}
+\end{equation*}
+
+\item Rotational kinetic energy:
+\begin{equation*}
+T_i = \frac12 J_i * \Omega_i
+\end{equation*}
+
+\item Gravitational binding energy:
+\begin{equation*}
+    W_i = M^p_i - M_i + T_i
+\end{equation*}
+where
+\begin{equation*}
+\begin{split}
+    M^p_i &= 4\pi \int r_e \frac{\dd s}{(1-s)^2} \left(r_e \frac{s}{1-s}\right)^2 \int \dd \mu \e^{2\alpha + \frac{\gamma-\rho}{2}} \frac{e_i}{\sqrt{1 - v_i^2}}  \\ 
+    &\equiv\int\int\int \dd\phi\dd r\dd\theta \sqrt{g} W e_i
+\end{split}
+\end{equation*}
+
+\item Velocity of co-rotating and counter-rotating particles with respect to ZAMO
+\begin{equation*}
+v_\pm = \frac{\pm \sqrt{v} + r_e s^2 \e^{-\rho} \partial_s \omega}{2 + (1-s) (\partial_s \gamma - \partial_s \rho)}
+\end{equation*}
+\begin{equation*}
+\sqrt{v} = r_e^2 s^4 \e^{-2 \rho} \left(\partial_s\omega\right)^2 + 2 (1 -s) \left[ \partial_s \gamma + \partial_s \rho - \left(\partial_s\rho\right)^2 \right]
+\end{equation*}
+
+\item Kepler angular velocity:
+\begin{equation*}
+\Omega_K = \omega_e + \frac{v_e^K}{r_e^{\text{BM}}} \e^{\rho_e}
+\end{equation*}
+Defining
+\begin{equation*}
+    \mathcal{Y} = \frac{{s_e}_{\text{BM}}^2 \left.\partial_s \omega \right|_{s_e}}{2 + (\left.\partial_s \gamma \right|_{s_e} - \left.\partial_s \rho \right|_{s_e}) {s_e}_{\text{BM}} (1 - {s_e}_{\text{BM}})} r_e \e^{-\rho}
+\end{equation*}
+we have
+\begin{equation*}
+v_e^K = \mathcal{Y} + \sqrt{ \mathcal{Y}  \frac{(1 - {s_e}_{\text{BM}}) 
+ (\left.\partial_s \gamma \right|_{s_e} + \left.\partial_s \rho\right|_{s_e})}{\left.\partial_s \omega \right|_{s_e}} + \mathcal{Y}^2}
+\end{equation*}
+
+\end{itemize}
+
+\end{document}

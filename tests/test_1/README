@@ -1,0 +1,24 @@
+# RNS Quick Test Utility
+
+A quick tool to verify the **RNSDiff_one** code against a single, hardcoded high-rotation model ($\lambda_1=2.0, \lambda_2=0.5$). 
+
+## Purpose
+This script provides an immediate check by running one specific configuration and comparing results directly with reference data from [inspirehep.net/literature/1861167](http://inspirehep.net/literature/1861167).
+
+## Usage
+
+Run the script by pointing to your compiled executable:
+
+```bash
+python3 quick_test.py --exec ../../RNSDiff_one
+```
+
+## What it does
+- Generates a temporary config file for the $\{2.0, 0.5\}$ lambda pair.
+- Executes the simulation and captures the log output.
+- Manages Files: Automatically moves the HDF5 output from ./output/output_2d/ to the current directory for analysis.
+- Calculates Errors: Parses both text logs and HDF5 data to compute relative errors for:
+    - Mass ($M, M_0$)
+    - Radius ($R_e$)
+    - Angular Momentum ($J$)
+    - Angular Velocity ($\Omega_c, \Omega_{max}, \Omega_e$)
