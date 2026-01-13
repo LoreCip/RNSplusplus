@@ -2,7 +2,7 @@
 # * MAKEFILE FOR RNS and RNSRegrid                   
 # *************************************************************************/
 
-MAIN = RNS_Diff_Jc
+MAIN = RNSDiff_one
 SIZE = -DMDIV=401 -DSDIV=801
 
 CC = gcc
